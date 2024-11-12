@@ -1,0 +1,2 @@
+TELEGRAM_GROUP_URL=https://t.me/CryptoProjects_sbt
+REF_LINK=https://t.me/herewalletbot/app?startapp=286283
