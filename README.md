@@ -11,9 +11,10 @@
 - Моя реферальная ссылка для Adspower: [Adspower](https://share.adspower.net/omnividente)и купон код omnividente для -45% скидки
 
 ## Установка
-
+```
 1. git clone https://github.com/Omnividente/near_adspower.git
 2. cd near_adspower
+```
 3. Заполните файл `accounts.txt` серийными номерами аккаунтов Adspower. Каждый серийный номер должен быть на отдельной строке. Аккаунт обязательно должен быть залогинен в web.telegram.org
 
 ![image](https://github.com/user-attachments/assets/5c457b41-e674-4b68-8577-8f931d1e2406)
