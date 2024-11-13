@@ -99,6 +99,16 @@ class TelegramBotAutomation:
             # Если основные квесты не завершены из-за ошибки, прерываем выполнение
             if not main_quests_performed:
                 logger.warning(f"Account {self.serial_number}: Main quests not completed due to an error.")
+                for attempt in range(5):  # Пытаемся не более 5 раз
+                    if self.open_section(1, "Home"):
+                        logger.info(f"Account {self.serial_number}: Returned to 'Home' section.")
+                        break  # Успешный переход на главную страницу, выходим из цикла
+                    else:
+                        logger.warning(f"Account {self.serial_number}: 'Home' section not available, attempting to go back (Attempt {attempt + 1}).")
+                        self.go_back_to_previous_page()
+                        time.sleep(2)  # Небольшая пауза перед следующей попыткой
+                else:
+                    logger.error(f"Account {self.serial_number}: Failed to return to 'Home' section after 5 attempts.")
                 return  # Прерывание выполнения при ошибке в основных квестах
 
             # Запускаем выполнение дополнительных квестов и проверяем их статус
@@ -107,6 +117,16 @@ class TelegramBotAutomation:
             # Если дополнительные квесты не завершены из-за ошибки, прерываем выполнение
             if not additional_quests_completed:
                 logger.warning(f"Account {self.serial_number}: Additional quests not completed due to an error.")
+                for attempt in range(5):  # Пытаемся не более 5 раз
+                    if self.open_section(1, "Home"):
+                        logger.info(f"Account {self.serial_number}: Returned to 'Home' section.")
+                        break  # Успешный переход на главную страницу, выходим из цикла
+                    else:
+                        logger.warning(f"Account {self.serial_number}: 'Home' section not available, attempting to go back (Attempt {attempt + 1}).")
+                        self.go_back_to_previous_page()
+                        time.sleep(2)  # Небольшая пауза перед следующей попыткой
+                else:
+                    logger.error(f"Account {self.serial_number}: Failed to return to 'Home' section after 5 attempts.")
                 return  # Прерывание выполнения при ошибке в дополнительных квестах
 
             # Проверка, что все квесты завершены
