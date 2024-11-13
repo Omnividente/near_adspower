@@ -8,7 +8,7 @@
 - Вход в веб-версию Телеграма в Adspower ([https://web.telegram.org/](https://web.telegram.org/))
 --------
 - Моя реферальная ссылка для [HOT Wallet](https://t.me/herewalletbot/app?startapp=286283)
-- Моя реферальная ссылка для Adspower: [Adspower](https://share.adspower.net/omnividente)и купон код omnividente для -45% скидки
+- Моя реферальная ссылка для Adspower: [Adspower](https://share.adspower.net/omnividente) и купон код omnividente для -45% скидки
 
 ## Установка
 ```
