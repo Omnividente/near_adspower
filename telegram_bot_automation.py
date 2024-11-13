@@ -116,15 +116,15 @@ class TelegramBotAutomation:
 
         except Exception as e:
             logger.error(f"Account {self.serial_number}: Error in process_mission_quests - {e}")
-            return  # Завершение при любой неожиданной ошибке
+            # Не прерываем выполнение здесь, так как блок перехода будет вне `try`
 
-        # Переход на главную страницу после завершения
+        # Переход на главную страницу после завершения или в случае ошибки
         for attempt in range(5):  # Пытаемся не более 5 раз
             if self.open_section(1, "Home"):
                 logger.info(f"Account {self.serial_number}: Returned to 'Home' section.")
                 break  # Успешный переход на главную страницу, выходим из цикла
             else:
-                #logger.warning(f"Account {self.serial_number}: 'Home' section not available, attempting to go back (Attempt {attempt + 1}).")
+                logger.warning(f"Account {self.serial_number}: 'Home' section not available, attempting to go back (Attempt {attempt + 1}).")
                 self.go_back_to_previous_page()
                 time.sleep(2)  # Небольшая пауза перед следующей попыткой
         else:
