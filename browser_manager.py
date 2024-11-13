@@ -131,7 +131,7 @@ class BrowserManager:
                 if is_account_completed(self.serial_number):        
                    request_url = (
                       f'http://local.adspower.net:50325/api/v1/browser/start?'
-                    f'serial_number={self.serial_number}&ip_tab=0&headless=0'
+                    f'serial_number={self.serial_number}&ip_tab=0&headless=1'
                     )
                 else:
                     request_url = (
