@@ -187,6 +187,9 @@ def process_accounts():
     wait_hours = random.randint(8, 14)
     logger.info(colored(f"All accounts processed. Waiting {wait_hours} hours before restarting."))
     for hour in range(wait_hours):
+        if interrupted:  # Проверка флага прерывания
+            logger.info("Process interrupted. Exiting early from wait cycle.")
+            break
         logger.info(colored(f"Waiting... {wait_hours - hour} hours left till restart."))
         time.sleep(60 * 60)  # ожидание в течение одного часа
 

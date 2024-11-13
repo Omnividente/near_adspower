@@ -741,6 +741,7 @@ class TelegramBotAutomation:
         self.open_storage_section()
         try:
             # Ищем элемент таймера с помощью find_timer_element, который возвращает процент заполнения
+         
             percent = self.find_timer_element()  # Теперь percent сразу становится числовым значением
             if percent is not None:
                 if percent == 100.0:
@@ -848,85 +849,41 @@ class TelegramBotAutomation:
                 logger.warning(f"Account {self.serial_number}: 'Storage' button not found.")
         except Exception as e:
             logger.error(f"Account {self.serial_number}: Error while trying to click 'Storage' button. Error: {e}")
-
-    def get_balance(self):
+  
+    def get_update_balance(self):       
         try:
-            # Ищем контейнер, который потенциально содержит элемент с именем пользователя
-            user_button_candidates = self.driver.find_elements(By.TAG_NAME, "button")
-            username = "N/A"
-            
-            for button in user_button_candidates:
-                # Проверяем, содержит ли кнопка элемент <p>, который может хранить имя пользователя
-                username_elements = button.find_elements(By.TAG_NAME, "p")
-                if username_elements:
-                    username = username_elements[0].text
-                    logger.info(f"Account {self.serial_number}: Username found - {username}")
-                    break
-            else:
-                logger.warning(f"Account {self.serial_number}: Username not found.")
-            
-            # Ищем элемент с балансом, используя вероятные признаки, такие как наличие точки или определённого формата числа
-            balance_candidates = self.driver.find_elements(By.TAG_NAME, "p")
-            balance = 0.0
+            # Находим контейнер, содержащий изображение "HOT" и числовое значение баланса
+            balance_container = self.wait_for_element(By.XPATH, "//div[img[contains(@src, 'hot')] and p]")
 
-            for element in balance_candidates:
-                balance_text = element.text.replace(",", "").strip()
-                if balance_text and re.match(r'^\d+(\.\d+)?$', balance_text):  # Проверка, является ли текст числом с дробной частью
-                    try:
-                        balance = float(balance_text)
-                        logger.info(f"Account {self.serial_number}: Balance found - {balance}")
-                        break
-                    except ValueError:
-                        logger.warning(f"Account {self.serial_number}: Element '{balance_text}' is not a valid balance format.")
-            
-            # Обновляем таблицу баланса
-            update_balance_table(self.serial_number, username, balance)
-            return balance, username
-
-        except Exception as e:
-            logger.error(f"Account {self.serial_number}: Error retrieving username and balance. Error: {e}")
-            return 0.0, "N/A"
-
-
-
-    
-    def get_update_balance(self):
-        try:
-            # Ищем div, содержащий два p элемента, где второй p предполагается с числовым значением баланса
-            balance_container = self.wait_for_element(By.XPATH, "//div[count(p)=2]")
-            
             if balance_container:
-                # Получаем все <p> элементы в этом контейнере
+                # Ищем все элементы <p> в контейнере
                 balance_elements = balance_container.find_elements(By.TAG_NAME, "p")
-                
-                # Проверяем наличие второго элемента и пытаемся преобразовать его текст в число
-                if len(balance_elements) >= 2:
-                    balance_text = balance_elements[1].text
+
+                # Проходим по всем элементам <p> и ищем первый, который можно преобразовать в число
+                for element in balance_elements:
+                    balance_text = element.text                    
                     try:
-                        # Преобразуем баланс в число с плавающей точкой
-                        balance = float(balance_text.replace(",", "").strip())
-                        #logger.info(f"Account {self.serial_number}: Balance found - {balance}")
-                        update_balance_table(self.serial_number, self.username, balance)
+                        # Преобразуем баланс в число с плавающей точкой, игнорируя потенциальный текст "HOT"
+                        balance = float(balance_text.replace(",", "").replace("HOT", "").strip())
+                        #logger.info(f"Account {self.serial_number}: Balance  UPDATE found - {balance}")
+                        update_balance_table(self.serial_number, self.username, balance)                        
                         return balance
                     except ValueError:
-                        logger.warning(f"Account {self.serial_number}: Could not convert '{balance_text}' to float.")
-                        return 0.0
-                else:
-                    logger.warning(f"Account {self.serial_number}: Expected <p> element with balance not found.")
-                    return 0.0
+                        # Если преобразование не удалось, переходим к следующему элементу
+                        continue
+
+                # Если не удалось найти числовое значение
+                logger.warning(f"Account {self.serial_number}: No valid balance found among text elements.")
+                return 0.0
+
             else:
                 logger.warning(f"Account {self.serial_number}: Balance container not found.")
                 return 0.0
 
         except Exception as e:
             logger.error(f"Account {self.serial_number}: Error retrieving balance. Error: {e}")
-            return 0.0    
+            return 0.0
     
-
-    import random
-
-    import random
-
     def get_remaining_time(self):
             try:
                 # Ищем все элементы <p> и проверяем, если они вообще найдены
