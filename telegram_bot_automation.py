@@ -104,7 +104,7 @@ class TelegramBotAutomation:
                         logger.info(f"Account {self.serial_number}: Returned to 'Home' section.")
                         break  # Успешный переход на главную страницу, выходим из цикла
                     else:
-                        logger.warning(f"Account {self.serial_number}: 'Home' section not available, attempting to go back (Attempt {attempt + 1}).")
+                        #logger.warning(f"Account {self.serial_number}: 'Home' section not available, attempting to go back (Attempt {attempt + 1}).")
                         self.go_back_to_previous_page()
                         time.sleep(2)  # Небольшая пауза перед следующей попыткой
                 else:
@@ -122,7 +122,7 @@ class TelegramBotAutomation:
                         logger.info(f"Account {self.serial_number}: Returned to 'Home' section.")
                         break  # Успешный переход на главную страницу, выходим из цикла
                     else:
-                        logger.warning(f"Account {self.serial_number}: 'Home' section not available, attempting to go back (Attempt {attempt + 1}).")
+                        #logger.warning(f"Account {self.serial_number}: 'Home' section not available, attempting to go back (Attempt {attempt + 1}).")
                         self.go_back_to_previous_page()
                         time.sleep(2)  # Небольшая пауза перед следующей попыткой
                 else:
@@ -446,10 +446,13 @@ class TelegramBotAutomation:
                 self.driver.execute_script("arguments[0].scrollIntoView(true);", section_button)
                 section_button.click()
                 logger.info(f"Account {self.serial_number}: '{section_name}' section button clicked.")
+                return True  # Успешный клик
             else:
                 logger.warning(f"Account {self.serial_number}: '{section_name}' section button not found at position {position}.")
+                return False  # Элемент не найден
         except Exception as e:
             logger.error(f"Account {self.serial_number}: Error while trying to open '{section_name}' section at position {position}. Error: {e}")
+            return False  # Ошибка при попытке найти или кликнуть на элемент
 
     def play_video(self):
         # Сохраняем текущую вкладку
