@@ -154,8 +154,8 @@ def process_accounts():
         process_account_task(account, settings)
 
     # Отображение таблицы перед перезапуском
-    logger.info("Main Cycle Balance Table (Before Retry):")
-    display_balance_table(account_info)
+    #logger.info("Main Cycle Balance Table (Before Retry):")
+    #display_balance_table(account_info)
 
     # Перезапуск для аккаунтов со статусом, отличным от 'Scheduled'
     retried_accounts = []

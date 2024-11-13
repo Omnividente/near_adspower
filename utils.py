@@ -53,7 +53,7 @@ def write_accounts_to_file(accounts):
         with open('accounts.txt', 'w') as file:
             for account in accounts:
                 file.write(f"{account}\n")
-        logger.info("Accounts written to file successfully.")
+        #logger.info("Accounts written to file successfully.")
     except IOError as e:
         logger.error(f"Failed to write accounts to file: {str(e)}")
     except Exception as e:

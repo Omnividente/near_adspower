@@ -119,9 +119,16 @@ class TelegramBotAutomation:
             return  # Завершение при любой неожиданной ошибке
 
         # Переход на главную страницу после завершения
-        time.sleep(3)
-        self.open_section(1, "Home")
-        logger.info(f"Account {self.serial_number}: Returned to 'Home' section.")
+        for attempt in range(5):  # Пытаемся не более 5 раз
+            if self.open_section(1, "Home"):
+                logger.info(f"Account {self.serial_number}: Returned to 'Home' section.")
+                break  # Успешный переход на главную страницу, выходим из цикла
+            else:
+                #logger.warning(f"Account {self.serial_number}: 'Home' section not available, attempting to go back (Attempt {attempt + 1}).")
+                self.go_back_to_previous_page()
+                time.sleep(2)  # Небольшая пауза перед следующей попыткой
+        else:
+            logger.error(f"Account {self.serial_number}: Failed to return to 'Home' section after 5 attempts.")
 
 
     
@@ -557,41 +564,6 @@ class TelegramBotAutomation:
         except Exception as e:
             logger.warning(f"Account {self.serial_number}: Could not click confirmation button. Error: {e}")
    
-
-    def find_progress_percentage(self):
-        try:
-            # Находим контейнер прогресса по уникальным признакам
-            progress_container = self.wait_for_element(By.XPATH, "//div[contains(@style, 'display: flex;') and contains(@style, 'height: 8px;')]")
-            
-            if progress_container:
-                # Находим вложенный элемент с процентом ширины (заполненности)
-                progress_element = progress_container.find_element(By.XPATH, "./div[2]")
-                style = progress_element.get_attribute("style")
-
-                # Извлекаем значение процента заполнения из стиля
-                width_value = None
-                if "width" in style:
-                    try:
-                        width_str = style.split("width:")[1].split("%")[0].strip()
-                        width_value = float(width_str)  # Преобразуем процент заполнения в float
-                        logger.info(f"Account {self.serial_number}: Progress percentage found - {width_value}%")
-                        return width_value  # Возвращаем значение ширины в процентах
-                    except ValueError:
-                        logger.warning(f"Account {self.serial_number}: Unable to parse width value from style: {style}")
-                        return None
-                else:
-                    logger.warning(f"Account {self.serial_number}: Width attribute not found in style: {style}")
-                    return None
-
-            else:
-                logger.warning(f"Account {self.serial_number}: Progress container not found.")
-                return None
-
-        except Exception as e:
-            logger.error(f"Account {self.serial_number}: Error retrieving progress percentage. Error: {e}")
-            return None
-
-    
  
     def wait_for_element(self, by, value, timeout=10):
         try:
@@ -685,10 +657,22 @@ class TelegramBotAutomation:
                     time.sleep(2)                    
                 logger.info(f"Account {self.serial_number}: Link clicked and process initiated.")
                 time.sleep(3)
+                # launch_button = self.driver.find_elements(By.CSS_SELECTOR, "button.popup-button.btn.primary.rp")
+                # if launch_button:
+                #     launch_button.click()
+                #     logger.info(f"Account {self.serial_number}: Launch button clicked.")
                 launch_button = self.driver.find_elements(By.CSS_SELECTOR, "button.popup-button.btn.primary.rp")
+
+                if not launch_button:
+                    # Попытка найти кнопку по дополнительному XPATH, используя содержимое <span>
+                    launch_button = self.driver.find_elements(By.XPATH, "//button[contains(@class, 'popup-button') and contains(@class, 'primary') and span[text()='Launch']]")
+
                 if launch_button:
-                    launch_button.click()
+                    # Прокручиваем к элементу, чтобы он был видимым, и выполняем клик
+                    self.driver.execute_script("arguments[0].scrollIntoView(true);", launch_button[0])
+                    launch_button[0].click()
                     logger.info(f"Account {self.serial_number}: Launch button clicked.")
+                
                 time.sleep(random.randint(15, 20))
                 self.switch_to_iframe()
                 return True
