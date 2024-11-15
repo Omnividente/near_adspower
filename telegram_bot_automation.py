@@ -2,7 +2,6 @@ import logging
 import random
 import time
 import json
-import os
 import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
@@ -163,7 +162,7 @@ class TelegramBotAutomation:
                 logger.info(f"Account {self.serial_number}: All main quests already completed.")
                 return True  # Возвращаем True, если весь блок уже завершён
 
-            all_main_quests_completed = True
+            # Переход к секции квестов
             quest_section = self.wait_for_element(By.XPATH, "//*[contains(text(), 'Explore crypto') or contains(text(), 'Исследуйте мир крипты')]")
             
             if quest_section:
@@ -172,42 +171,110 @@ class TelegramBotAutomation:
                 logger.warning(f"Account {self.serial_number}: Quest section not found.")  
                 return False  # Если секция не найдена, завершаем выполнение
 
-            # Проходим каждый основной квест
-            for i in range(1, 15):
-                quest_button_xpath = f"/html/body/div[1]/div[2]/div/div[2]/div[2]/div/div[{i}]"
-                quest_button = self.wait_for_element(By.XPATH, quest_button_xpath, timeout=5)
+            # Выполняем квесты
+            quest_count = 14  # Количество квестов (или используем динамическое определение)
+            for i in range(1, quest_count + 1):
+                try:
+                    # Ищем основной контейнер с квестами перед каждой итерацией
+                    main_container = self.wait_for_element(
+                        By.XPATH, 
+                        "//h3[contains(text(), 'EARN') or contains(text(), 'Заработать')]/following-sibling::div"
+                    )
 
-                # Если кнопка квеста найдена и квест ещё не завершён, выполняем его
-                if quest_button and not self.is_quest_button_completed(quest_button):
-                    quest_button.click()
-                    logger.info(f"Account {self.serial_number}: Main quest button {i} clicked.")
+                    if not main_container:
+                        logger.warning(f"Account {self.serial_number}: Main quest container not found.")
+                        return False
 
-                    # Запускаем и завершаем основной квест
-                    if not self.start_and_complete_quest(f"Quest {i}"):
-                        all_main_quests_completed = False
-                        break  # Прекращаем выполнение цикла, если возникла ошибка
-                elif not quest_button:
-                    logger.warning(f"Account {self.serial_number}: Quest button {i} not found.")
+                    # Получаем актуальный список квестов
+                    quests = main_container.find_elements(By.XPATH, "./div")
+
+                    # Проверяем, что текущий квест существует и не завершен
+                    if i <= len(quests):
+                        quest = quests[i - 1]
+                        if not self.is_quest_button_completed(quest):
+                            quest.click()
+                            logger.info(f"Account {self.serial_number}: Main quest button {i} clicked.")
+
+                            # Добавляем небольшую паузу, чтобы элементы страницы обновились
+                            time.sleep(2)
+
+                            # Запускаем и завершаем квест
+                            if not self.start_and_complete_quest(f"Quest {i}"):
+                                logger.warning(f"Account {self.serial_number}: Quest {i} failed to complete.")
+                                return False  # Прерываем выполнение и возвращаем False при ошибке
+                           
+                            time.sleep(1)
+                    else:
+                        logger.warning(f"Account {self.serial_number}: Quest {i} not found in the list.")
+                        break  # Прекращаем цикл, если квестов меньше, чем ожидалось
+
+                except Exception as e:
+                    logger.warning(f"Account {self.serial_number}: Error processing quest {i} - {e}")
+                    return False  # Прерываем выполнение и возвращаем False при любой ошибке
+
+            return True  # Возвращаем True, если все квесты выполнены успешно
+
+        except Exception as e:
+            logger.error(f"Account {self.serial_number}: Error in check_and_complete_main_quests - {e}")
+            return False
+
+
+
+        
+    def check_and_complete_main_quests2(self):
+        logger.info(f"Account {self.serial_number}: Checking main quests.")
+
+        try:
+            # Проверка выполнения всего блока основных квестов
+            if self.is_quest_completed():
+                logger.info(f"Account {self.serial_number}: All main quests already completed.")
+                return True  # Возвращаем True, если весь блок уже завершён
+
+            all_main_quests_completed = True
+
+            # Переход к секции квестов
+            quest_section = self.wait_for_element(By.XPATH, "//*[contains(text(), 'Explore crypto') or contains(text(), 'Исследуйте мир крипты')]")
+            
+            if quest_section:
+                self.scroll_and_click(quest_section)
+            else:
+                logger.warning(f"Account {self.serial_number}: Quest section not found.")  
+                return False  # Если секция не найдена, завершаем выполнение
+
+            # Находим основной контейнер, содержащий квесты
+            main_container = self.wait_for_element(By.XPATH, "//div[contains(@style, 'justify-content: space-around')]")
+            
+            # Проверяем, что контейнер найден
+            if not main_container:
+                logger.warning(f"Account {self.serial_number}: Main quest container not found.")
+                return False
+
+            # Получаем все дочерние элементы (квесты) в контейнере
+            quests = main_container.find_elements(By.XPATH, "./div")
+
+            # Проходим по каждому квесту
+            for index, quest in enumerate(quests, start=1):
+                try:
+                    # Если кнопка квеста найдена и квест ещё не завершён, выполняем его
+                    if quests and not self.is_quest_button_completed(quests):
+                       quests.click()
+                       logger.info(f"Account {self.serial_number}: Main quest button {i} clicked.")
+
+                       # Запускаем и завершаем основной квест
+                       if not self.start_and_complete_quest(f"Quest {i}"):
+                           all_main_quests_completed = False
+                           return False  # Прекращаем выполнение цикла, если возникла ошибка                        
+                except Exception as e:
+                    logger.warning(f"Account {self.serial_number}: Error processing quest {index} - {e}")
                     all_main_quests_completed = False
+                    return False
 
             return all_main_quests_completed
 
         except Exception as e:
-            # Логируем ошибку и прерываем выполнение квестов
-            logger.error(f"Account {self.serial_number}: Error encountered in check_and_complete_main_quests - {e}")
+            logger.error(f"Account {self.serial_number}: Error in check_and_complete_main_quests - {e}")
             return False
-
-        # Если выполнялись основные квесты, нажимаем кнопку завершения
-        # try:
-        #     final_button = self.wait_for_element(By.TAG_NAME, "button", timeout=20)
-        #     if final_button:
-        #         final_button.click()
-        #         logger.info(f"Account {self.serial_number}: Final button clicked after completing main quests.")
-        #     else:
-        #         logger.warning(f"Account {self.serial_number}: No final button found after completing main quests.")
-        # except Exception as e:
-        #         logger.error(f"Account {self.serial_number}: Error occurred while trying to click the final button. Error: {e}")
-        # return all_main_quests_completed
+    
 
     def process_additional_quests_from_missions(self):
         logger.info(f"Account {self.serial_number}: Starting additional quests from 'Missions'.")
@@ -342,7 +409,7 @@ class TelegramBotAutomation:
 
 
         
-    def start_and_complete_quest(self, quest_titles, section_name=None):
+    def start_and_complete_quest(self, section_name=None):
         """
         This method starts and completes a quest by finding the element containing the full text of one of the quest titles.
         """
@@ -380,6 +447,7 @@ class TelegramBotAutomation:
                         self.driver.execute_script("arguments[0].scrollIntoView({ behavior: 'smooth', block: 'center' });", quest_section)
                         ActionChains(self.driver).move_to_element(quest_section).pause(random.uniform(0.5, 1.5)).click(quest_section).perform()
                         logger.info(f"Account {self.serial_number}: Navigated to quest section.")
+                        return True
                     else:
                         logger.warning(f"Account {self.serial_number}: Quest section not found.")
                         return False
@@ -680,10 +748,7 @@ class TelegramBotAutomation:
                     time.sleep(2)                    
                 logger.info(f"Account {self.serial_number}: Link clicked and process initiated.")
                 time.sleep(3)
-                # launch_button = self.driver.find_elements(By.CSS_SELECTOR, "button.popup-button.btn.primary.rp")
-                # if launch_button:
-                #     launch_button.click()
-                #     logger.info(f"Account {self.serial_number}: Launch button clicked.")
+                
                 launch_button = self.driver.find_elements(By.CSS_SELECTOR, "button.popup-button.btn.primary.rp")
 
                 if not launch_button:
