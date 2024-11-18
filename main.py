@@ -40,6 +40,8 @@ def signal_handler(sig, frame):
     global interrupted
     interrupted = True  # Устанавливаем флаг прерывания
     logger.error("Process interrupted by user. Exiting...")
+    for timer in active_timers:
+        timer.cancel()
     sys.exit(0)
 
 def is_account_completed(account, filename="all_quest_complete.txt"):
@@ -79,6 +81,8 @@ if not logger.hasHandlers():
 # Data structure to store account information
 account_info = {}
 
+active_timers = []
+
 def process_account_task(account, settings):
     """
     Process each account's tasks and schedule a next run based on remaining_time.
@@ -96,6 +100,14 @@ def process_account_task(account, settings):
             raise Exception("Failed to send message")
         if not bot.click_link():
             raise Exception("Failed to click link")
+               
+        if bot.is_new_account_page():
+            if bot.run_account_registration_process():
+                logger.info("New account created successfully.")
+            else:
+                logger.warning("Failed to create new account.")
+        time.sleep(3)
+        bot.process_claim_block()
 
         if not is_account_completed(account):
             try:
@@ -105,13 +117,13 @@ def process_account_task(account, settings):
                 bot.open_section(1, "Home")
         else:
             logger.info(f"Account {account}: Quests already completed, skipping.")  
-
+        
         balance, username = bot.get_balance()
         account_info[account]["username"] = username
         account_info[account]["balance"] = balance    
         bot.farming()     
         
-        #Обновление баланса после фарминга
+        # Обновление баланса после фарминга
         balance = bot.get_update_balance()
         account_info[account]["balance"] = balance
         logger.info(f"Account {account}: Processing completed successfully.")
@@ -130,13 +142,17 @@ def process_account_task(account, settings):
         account_info[account]["next_run_time"] = next_run_time
         account_info[account]["status"] = "Scheduled"
         logger.info(f"Account {account}: Next run scheduled at {next_run_time}.")
-
         # Устанавливаем индивидуальный таймер для перезапуска задачи аккаунта
-        timer = threading.Timer(remaining_time_seconds, process_account_task, args=(account, settings))
-        timer.start()
+        if not interrupted:  # Проверяем флаг прерывания перед созданием таймера
+            timer = threading.Timer(remaining_time_seconds, process_account_task, args=(account, settings))
+            timer.start()
+            active_timers.append(timer)  # Сохраняем таймер в список для последующей отмены
+        else:
+            logger.info(f"Account {account}: Process interrupted before scheduling next run.")
     else:
         account_info[account]["next_run_time"] = "Immediate"
         account_info[account]["status"] = "Completed"
+    display_balance_table(account_info)    
 
 def process_accounts():
     reset_balances()

@@ -2,6 +2,7 @@ import requests
 import time
 import logging
 import sys
+import json
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -134,9 +135,10 @@ class BrowserManager:
                     f'serial_number={self.serial_number}&ip_tab=0&headless=1'
                     )
                 else:
+                    launch_args = json.dumps([f"--disable-popup-blocking"])
                     request_url = (
                       f'http://local.adspower.net:50325/api/v1/browser/start?'
-                    f'serial_number={self.serial_number}&ip_tab=0&headless=0'
+                    f'serial_number={self.serial_number}&ip_tab=0&headless=0&launch_args={launch_args}'
                     )
                 response = requests.get(request_url)
                 response.raise_for_status()

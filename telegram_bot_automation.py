@@ -2,17 +2,20 @@ import logging
 import random
 import time
 import json
+import requests
 import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException, WebDriverException, TimeoutException, ElementClickInterceptedException
+from selenium.common.exceptions import NoSuchElementException, WebDriverException, TimeoutException, ElementNotInteractableException
 from browser_manager import BrowserManager
+import pyautogui
+from selenium.webdriver.common.action_chains import ActionChains
 from utils import update_balance_table
 from colorama import Fore, Style
 from termcolor import colored
-
 
 # Set up logging with colors
 logger = logging.getLogger(__name__)
@@ -521,8 +524,83 @@ class TelegramBotAutomation:
         except Exception as e:
             logger.error(f"Account {self.serial_number}: Error while trying to open '{section_name}' section at position {position}. Error: {e}")
             return False  # Ошибка при попытке найти или кликнуть на элемент
-
+    
     def play_video(self):
+        """
+        Нажимает на кнопку для просмотра видео, перебирая все доступные кнопки, пока не откроется новая вкладка.
+        """
+        # Сохраняем текущую вкладку
+        original_window = self.driver.current_window_handle
+
+        try:
+            # Находим все кнопки
+            buttons = self.driver.find_elements(By.XPATH, "//button | //a")
+            if not buttons:
+                logger.warning(f"Account {self.serial_number}: No buttons found on the page.")
+                return
+
+            logger.info(f"Account {self.serial_number}: Found {len(buttons)} buttons. Attempting to click each.")
+
+            for index, button in enumerate(buttons, start=1):
+                try:
+                    # Проверяем текст кнопки (для логирования)
+                    button_text = button.text.strip() if button.text else "No text"
+                    logger.info(f"Account {self.serial_number}: Trying button {index}: '{button_text}'.")
+
+                    # Прокручиваем к кнопке
+                    self.driver.execute_script(
+                        "arguments[0].scrollIntoView({ behavior: 'smooth', block: 'center' });", button
+                    )
+                    time.sleep(1)
+
+                    # Пытаемся кликнуть стандартным способом
+                    try:
+                        button.click()
+                        logger.info(f"Account {self.serial_number}: Clicked button {index} using standard click.")
+                    except Exception as click_error:
+                        logger.warning(f"Account {self.serial_number}: Standard click failed for button {index}. Trying JavaScript click. Error: {click_error}")
+                        # Резервный клик через JavaScript
+                        self.driver.execute_script("arguments[0].click();", button)
+                        logger.info(f"Account {self.serial_number}: Clicked button {index} using JavaScript click.")
+
+                    time.sleep(3)  # Задержка для загрузки новой вкладки
+
+                    # Проверяем, появилась ли новая вкладка
+                    new_window = None
+                    for window in self.driver.window_handles:
+                        if window != original_window:
+                            new_window = window
+                            break
+
+                    if new_window:
+                        # Переключаемся на новую вкладку
+                        self.driver.switch_to.window(new_window)
+                        logger.info(f"Account {self.serial_number}: Switched to new video window.")
+                        time.sleep(5)  # Задержка для имитации просмотра видео
+
+                        # Закрываем вкладку с видео
+                        self.driver.close()
+                        logger.info(f"Account {self.serial_number}: Video window closed.")
+
+                        # Возвращаемся к исходной вкладке
+                        self.driver.switch_to.window(original_window)
+                        logger.info(f"Account {self.serial_number}: Switched back to original window.")
+                        self.switch_to_iframe()
+                        return  # Успешное завершение
+
+                except Exception as button_error:
+                    logger.warning(f"Account {self.serial_number}: Error clicking button {index}: {button_error}")
+
+            logger.error(f"Account {self.serial_number}: No buttons opened a new video window.")
+        except Exception as e:
+            logger.error(f"Account {self.serial_number}: Error in play_video: {e}")
+
+
+
+
+
+     
+    def play_video2(self):
         # Сохраняем текущую вкладку
         original_window = self.driver.current_window_handle
 
@@ -577,14 +655,49 @@ class TelegramBotAutomation:
         element.click()
 
     def is_quest_completed(self):
-        quest_section = self.wait_for_element(By.XPATH, "//*[contains(text(), 'Explore crypto') or contains(text(), 'Исследуйте мир крипты')]")
-        if quest_section:
-            quest_container = quest_section.find_element(By.XPATH, "./ancestor::div[3]")
-            completed_text_elements = quest_container.find_elements(By.XPATH, ".//*[contains(text(), 'Выполнено') or contains(text(), 'Completed')]")
-            return bool(completed_text_elements)
-        else:
-            logger.warning("Quest container not found.")
-            return False
+        """
+        Проверяет, завершён ли квест, на основе текста "Выполнено" или "Completed", с тремя попытками поиска.
+        """
+        max_attempts = 3  # Максимальное количество попыток
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.info(f"Attempt {attempt}/{max_attempts} to check if quest is completed.")
+                
+                # Находим секцию квеста по тексту
+                quest_section = self.wait_for_element(By.XPATH, "//*[contains(text(), 'Explore crypto') or contains(text(), 'Исследуйте мир крипты')]")
+                
+                if quest_section:
+                    # Поднимаемся к общему контейнеру
+                    quest_container = quest_section.find_element(By.XPATH, "./ancestor::div[contains(@style, 'position: relative')]")
+                    
+                    # Проверяем наличие текста "Completed" или "Выполнено" в контейнере
+                    completed_text_element = quest_container.find_elements(By.XPATH, ".//*[contains(text(), 'Completed') or contains(text(), 'Выполнено')]")
+                    
+                    if completed_text_element:
+                        logger.info(f"Quest is marked as completed on attempt {attempt}.")
+                        return True
+                    elif attempt == max_attempts:
+                        logger.info("Quest is not marked as completed after all attempts.")
+                        return False
+                elif attempt == max_attempts:
+                    logger.warning("Quest section not found after all attempts.")
+                    return False
+                
+            except Exception as e:
+                logger.error(f"Error in attempt {attempt}/{max_attempts} of is_quest_completed: {e}")
+            
+            # Задержка перед следующей попыткой
+            if attempt < max_attempts:
+                time.sleep(2)
+        
+        # Если все попытки не увенчались успехом, возвращаем False
+        logger.error("All attempts to check if quest is completed failed.")
+        return False
+
+
+
+
+
 
     def is_quest_button_completed(self, quest_button):
         button_html = quest_button.get_attribute("outerHTML")
@@ -656,16 +769,20 @@ class TelegramBotAutomation:
             logger.warning(f"Account {self.serial_number}: Could not click confirmation button. Error: {e}")
    
  
-    def wait_for_element(self, by, value, timeout=10):
+    def wait_for_element(self, by, value, parent=None, timeout=10):
+        """
+        Ожидает появления элемента на странице и возвращает его.
+        Если указан parent, поиск будет в пределах указанного родителя.
+        """
         try:
-            return WebDriverWait(self.driver, timeout).until(
-                EC.element_to_be_clickable((by, value))
-            )
+            if parent:
+                WebDriverWait(parent, timeout).until(lambda _: parent.find_element(by, value))
+                return parent.find_element(by, value)
+            else:
+                WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located((by, value)))
+                return self.driver.find_element(by, value)
         except TimeoutException:
-            logger.warning(f"Account {self.serial_number}: Could not find element by {by} with value {value} in {timeout} seconds.")
-            return None
-        except Exception as e:
-            logger.error(f"Account {self.serial_number}: Unexpected error while waiting for element - {e}")
+            #logger.warning(f"Could not find element by {by} with value {value} in {timeout} seconds.")
             return None
 
     def navigate_to_bot(self):
@@ -915,40 +1032,38 @@ class TelegramBotAutomation:
         except Exception as e:
             logger.error(f"Account {self.serial_number}: Error while trying to click 'Storage' button. Error: {e}")
   
-    def get_update_balance(self):       
+    def get_update_balance(self):
         try:
-            # Находим контейнер, содержащий изображение "HOT" и числовое значение баланса
-            balance_container = self.wait_for_element(By.XPATH, "//div[img[contains(@src, 'hot')] and p]")
-
-            if balance_container:
-                # Ищем все элементы <p> в контейнере
-                balance_elements = balance_container.find_elements(By.TAG_NAME, "p")
-
-                # Проходим по всем элементам <p> и ищем первый, который можно преобразовать в число
-                for element in balance_elements:
-                    balance_text = element.text                    
+            # Ищем все элементы <p> на странице
+            elements = self.driver.find_elements(By.TAG_NAME, "p")
+            
+            for element in elements:
+                # Проверяем текст элемента
+                if "HOT Баланс" in element.text or "HOT Balance" in element.text:
+                    # Если текст найден, переходим к родительскому контейнеру
+                    parent_container = element.find_element(By.XPATH, "./parent::div")
+                    
+                    # Находим второй <p>, содержащий баланс
+                    balance_value_element = parent_container.find_element(By.XPATH, ".//p[2]")
+                    
+                    # Извлекаем текст и преобразуем его в число
+                    balance_text = balance_value_element.text.strip()
                     try:
-                        # Преобразуем баланс в число с плавающей точкой, игнорируя потенциальный текст "HOT"
-                        balance = float(balance_text.replace(",", "").replace("HOT", "").strip())
-                        #logger.info(f"Account {self.serial_number}: Balance  UPDATE found - {balance}")
-                        update_balance_table(self.serial_number, self.username, balance)                        
+                        balance = float(balance_text.replace(",", ""))
+                        logger.info(f"Account {self.serial_number}: HOT Balance found: {balance}")
                         return balance
                     except ValueError:
-                        # Если преобразование не удалось, переходим к следующему элементу
-                        continue
-
-                # Если не удалось найти числовое значение
-                logger.warning(f"Account {self.serial_number}: No valid balance found among text elements.")
-                return 0.0
-
-            else:
-                logger.warning(f"Account {self.serial_number}: Balance container not found.")
-                return 0.0
+                        logger.warning(f"Account {self.serial_number}: Could not convert balance text to number: {balance_text}")
+                        return 0.0
+            
+            # Если ни один из элементов не содержит нужного текста
+            logger.warning(f"Account {self.serial_number}: HOT Balance text not found.")
+            return 0.0
 
         except Exception as e:
-            logger.error(f"Account {self.serial_number}: Error retrieving balance. Error: {e}")
+            logger.error(f"Account {self.serial_number}: Error retrieving HOT balance. Error: {e}")
             return 0.0
-    
+  
     def get_remaining_time(self):
             try:
                 # Ищем все элементы <p> и проверяем, если они вообще найдены
@@ -999,5 +1114,348 @@ class TelegramBotAutomation:
             except Exception as e:
                 logger.error(f"Account {self.serial_number}: Error retrieving remaining time. Error: {e}")
                 return None
+
+
+    def run_account_registration_process(self):
+        """
+        Основной процесс регистрации нового аккаунта.
+        Последовательно выполняет шаги регистрации, включая создание аккаунта, 
+        закрытие обучающих попапов, нажатие кнопки "Продолжить" и подписку на Telegram-канал.
+        """
+        try:
+            # Шаг 1: Подписка на Telegram-канал
+            logger.info("Подписываемся на Telegram-канал...")
+            self.subscribe_to_telegram_channel()
+            self.switch_to_iframe()
+            # Шаг 2: Создание нового аккаунта
+            try:
+                # Нажимаем на кнопку "Создать новый аккаунт"
+                create_account_button = self.wait_for_element(
+                    By.XPATH,
+                    "//button[contains(text(), 'Создать новый аккаунт') or contains(text(), 'Create new account')]"
+                )
+                if create_account_button:
+                    create_account_button.click()
+                    logger.info("Нажата кнопка 'Создать новый аккаунт'.")
+                else:
+                    logger.warning("Кнопка 'Создать новый аккаунт' не найдена.")
+                    return False
+
+                # Проверяем наличие заголовка страницы "Создать аккаунт"
+                header_element = self.wait_for_element(
+                    By.XPATH,
+                    "//h1[contains(text(), 'Создать аккаунт') or contains(text(), 'Create Account')]",
+                    timeout=10
+                )
+                if not header_element:
+                    logger.warning("Заголовок страницы 'Создать аккаунт' не найден.")
+                    return False
+
+                # Сохраняем никнейм
+                inputs = self.driver.find_elements(By.TAG_NAME, "input")
+                nickname = None
+                for input_element in inputs:
+                    if input_element.get_attribute("disabled") and ".tg" in input_element.get_attribute("value"):
+                        nickname = input_element.get_attribute("value")
+                        break
+                
+                if nickname:
+                    logger.info(f"Найден никнейм: {nickname}")
+                else:
+                    logger.warning("Никнейм не найден.")
+                    return False
+
+                # Найти контейнер seed-фразы и сохранить текст
+                seed_phrase_container = self.wait_for_element(
+                    By.XPATH,
+                    "//div[contains(@style, 'text-align: left;') and contains(@style, 'filter: blur')]"
+                )
+                if seed_phrase_container:
+                    seed_phrase_container.click()  # Отображаем текст seed-фразы
+                    seed_phrase = seed_phrase_container.text
+                    logger.info(f"Найдена seed-фраза: {seed_phrase}")
+                else:
+                    logger.warning("Контейнер с seed-фразой не найден.")
+                    return False
+
+                # Подтвердить создание аккаунта
+                confirm_creation_button = self.wait_for_element(
+                    By.XPATH,
+                    "//button[contains(text(), 'Создать') or contains(text(), 'Create')]"
+                )
+                if confirm_creation_button:
+                    confirm_creation_button.click()
+                    logger.info("Нажата кнопка 'Создать' для завершения создания аккаунта.")
+                else:
+                    logger.warning("Кнопка подтверждения создания аккаунта не найдена.")
+                    return False
+
+                # Сохранение информации об аккаунте
+                self.save_account_info(nickname, seed_phrase)
+
+            except Exception as e:
+                logger.error(f"Ошибка при создании аккаунта: {e}")
+                return False
+            
+            
+            # Шаг 3: Закрытие обучающих попапов
+            logger.info("Ждем и закрываем обучающие попапы...")
+            self.close_tutorial_popup()
+
+            # Шаг 4: Нажатие кнопки "Продолжить" до недоступности
+            logger.info("Нажимаем кнопку 'Продолжить', пока она доступна...")
+            self.click_continue_button_until_unavailable()
+           
+
+            # Шаг 4: Жмем назад
+            time.sleep(5)
+            self.click_until_disappear()
+
+            # Завершение процесса
+            logger.info("Процесс регистрации нового аккаунта завершен успешно.")
+            return True
+
+        except Exception as e:
+            logger.error(f"Ошибка в процессе регистрации нового аккаунта: {e}")
+            return False
+
+    def is_new_account_page(self):
+        try:
+            # Проверка заголовка страницы
+            header = self.wait_for_element(By.XPATH, "//h1[contains(text(), 'HOT Wallet')]", timeout=5)
+            if not header:
+                return False
+
+            # Проверка кнопки «Создать новый аккаунт» или «Create New Account»
+            create_account_button = self.wait_for_element(
+                By.XPATH,
+                "//button[contains(text(), 'Создать новый аккаунт') or contains(text(), 'Create New Account')]",
+                timeout=5
+            )
+            if not create_account_button:
+                return False
+
+            # Если оба элемента найдены, возвращаем True
+            return True
+
+        except Exception:
+            # Любая другая ошибка приведет к возврату False
+            return False
+
+
+    def save_account_info(self, nickname, seed_phrase):
+        filename = "all_accounts_info.txt"
+        with open(filename, "a") as f:
+            f.write(f"Nickname: {nickname}\n")
+            f.write(f"Seed Phrase: {seed_phrase}\n")
+            f.write("----\n")  # Разделитель между аккаунтами
+        logger.info(f"Account information for {nickname} appended to {filename}")
+    
+    def close_tutorial_popup(self):
+        """
+        Закрывает обучающий попап, дожидаясь появления div-элементов с нужными признаками в течение 2 минут.
+        """
+        try:
+            # Условие для ожидания элемента
+            def tutorial_popup_condition(driver):
+                buttons = driver.find_elements(By.TAG_NAME, "div")
+                for button in buttons:
+                    if button.value_of_css_property("z-index") == "1002" and \
+                            ("Клейм" in button.text or "Claim" in button.text):
+                        return button  # Возвращает найденный элемент
+                return None
+
+            # Ожидаем элемент в течение 2 минут (120 секунд)
+            target_button = WebDriverWait(self.driver, 120).until(tutorial_popup_condition)
+            
+            # Если элемент найден, кликаем по нему
+            time.sleep(5)
+            if target_button:
+                target_button.click()
+                logger.info("Обучающий попап закрыт.")
+            else:
+                logger.warning("Обучающий попап не найден.")
+                
+        except TimeoutException:
+            logger.error("Обучающий попап не появился в течение 2 минут.")
+        except NoSuchElementException:
+            logger.error("Error: Обучающий попап не найден.")
+        except Exception as e:
+            logger.error(f"Неожиданная ошибка при закрытии обучающего попапа: {e}")
+
+    def click_continue_button_until_unavailable(self, max_attempts=20):
+        attempts = 0
+        while attempts < max_attempts:
+            try:
+                # Находим контейнер с кнопкой "Продолжить"
+                container = self.driver.find_element(By.XPATH, "//div[contains(@style, 'display: flex') and contains(@style, 'justify-content: space-between')]")
+
+                # Находим все кнопки внутри контейнера
+                buttons = container.find_elements(By.TAG_NAME, "button")
+
+                # Если кнопки найдены, кликаем по первой доступной
+                if buttons:
+                    for button in buttons:
+                        try:
+                            button.click()
+                            logger.info(f"Clicked 'Continue' button. Attempt {attempts + 1}.")
+                            break
+                        except ElementNotInteractableException:
+                            continue
+                else:
+                    logger.info("No 'Continue' button found in the container.")
+                    break
+
+                # Увеличиваем счётчик попыток
+                attempts += 1
+                time.sleep(2)
+
+            except NoSuchElementException:
+                logger.info("Кнопка 'Продолжить' больше не доступна.")
+                break
+
+        if attempts == max_attempts:
+            logger.warning("Достигнуто максимальное количество попыток нажатия кнопки 'Продолжить'.")
+        time.sleep(3)
+
+    def subscribe_to_telegram_channel(self):
+        try:
+            # Сохраняем текущую вкладку
+            original_window = self.driver.current_window_handle
+
+            # URL канала
+            channel_url = "https://web.telegram.org/k/#@hotonnear"
+
+            # Открываем новую вкладку
+            self.driver.execute_script(f"window.open('{channel_url}', '_blank');")
+            logger.info("Открыли новую вкладку для подписки на Telegram-канал.")
+
+            # Переходим в новую вкладку
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            logger.info("Переключились на вкладку с Telegram-каналом.")
+
+            # Ждём загрузки страницы
+            self.wait_for_element(By.CSS_SELECTOR, ".btn-primary.btn-color-primary.chat-join.rp", timeout=10)
+
+            # Находим и нажимаем кнопку "Подписаться"
+            join_button = self.driver.find_element(By.CSS_SELECTOR, ".btn-primary.btn-color-primary.chat-join.rp")
+            self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", join_button)
+            join_button.click()
+            logger.info("Успешно подписались на Telegram-канал.")
+
+            # Ждём завершения действий
+            time.sleep(5)
+
+            # Закрываем вкладку и возвращаемся на исходную
+            self.driver.close()
+            logger.info("Закрыли вкладку с Telegram-каналом.")
+            self.driver.switch_to.window(original_window)
+
+        except Exception as e:
+            logger.error(f"Ошибка при подписке на Telegram-канал: {e}")
+            if len(self.driver.window_handles) > 1:
+                self.driver.close()
+                self.driver.switch_to.window(original_window)
+
+    def click_until_disappear(self):
+        """
+        Нажимает любую кнопку в окне до тех пор, пока окно не исчезнет,
+        затем ожидает появления элемента хранилища.
+        """
+        try:
+            # Нажимаем кнопки до тех пор, пока окно не исчезнет
+            while True:
+                try:
+                    # Проверяем, существует ли окно
+                    popup = self.driver.find_element(By.XPATH, "//div[contains(@class, 'popup') or contains(@class, 'modal')]")
+
+                    # Находим все кнопки внутри окна
+                    buttons = popup.find_elements(By.TAG_NAME, "button")
+                    
+                    if buttons:
+                        for button in buttons:
+                            try:
+                                # Скроллим к кнопке и нажимаем
+                                self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", button)
+                                button.click()
+                                logger.info("Кнопка найдена и нажата.")
+                                time.sleep(2)  # Ждём обновления после нажатия
+                                break  # Переходим к следующей итерации
+                            except Exception as e:
+                                logger.warning(f"Ошибка при нажатии кнопки: {e}")
+                                continue
+                    else:
+                        logger.info("Кнопки в окне не найдены. Проверяем окно снова.")
+
+                except NoSuchElementException:
+                    # Если окно исчезло, выходим из цикла
+                    logger.info("Окно исчезло. Переходим к ожиданию хранилища.")
+                    break
+
+            # Переходим назад на предыдущую страницу
+            time.sleep(5)
+            self.go_back_to_previous_page()
+
+            # Ожидание появления хранилища (до 3 минут)
+            try:
+                logger.info("Ожидаем появления элемента хранилища до 3 минут...")
+                storage_element = WebDriverWait(self.driver, 180).until(
+                    EC.element_to_be_clickable((By.XPATH, "//div[contains(@style, 'cursor: pointer') and .//h4]"))
+                )
+                logger.info("Элемент хранилища найден.")
+                return storage_element
+            except TimeoutException:
+                logger.error("Не удалось дождаться появления элемента хранилища в течение 3 минут.")
+                return None
+
+        except Exception as e:
+            logger.error(f"Ошибка в процессе нажатия кнопок или ожидания хранилища: {e}")
+            return None
+    
+    def process_claim_block(self):
+        self.switch_to_iframe
+        """
+        Проверяет наличие блока с текстом '0.01' на странице,
+        скроллит к нему и нажимает на него при обнаружении, затем выполняет последовательность действий.
+        """
+        try:
+            #logger.info("Ищем блок с текстом 'Клейм 0.01 ()' на всей странице...")
+
+            # Ожидаем появления блока 
+            claim_block = self.wait_for_element(By.XPATH, "//*[contains(text(), 'Клейм') or contains(text(), 'Claim')]")
+            
+
+            if claim_block:
+                logger.info("Обнаружена незавершенная регистрация. Завершаем...")
+                # Скроллим к найденному элементу
+                self.driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", claim_block)
+
+                # Делаем небольшой таймаут для завершения скроллинга
+                time.sleep(1)
+
+                # Нажимаем на элемент
+                #logger.info("Нажимаем на блок с текстом 'Клейм 0.01 ()'...")
+                claim_block.click()
+
+                #logger.info("Нажимаем кнопку 'Продолжить', пока она доступна...")
+                self.click_continue_button_until_unavailable()
+
+                time.sleep(5)
+
+                #logger.info("Нажимаем кнопки до тех пор, пока окно не исчезнет...")
+                self.click_until_disappear()
+
+                #logger.info("Обработка блока с текстом 'Клейм 0.01 ()' завершена.")
+            else:
+                pass
+                #logger.warning("Блок с текстом 'Клейм 0.01 ()' не найден на странице.")
+        except TimeoutException:
+            logger.warning("Не удалось найти блок с текстом 'Клейм 0.01 ()' в течение 2 минут.")
+        except Exception as e:
+            logger.error(f"Ошибка при обработке блока с текстом 'Клейм 0.01 ()': {e}")
+
+
+
+
 
 
