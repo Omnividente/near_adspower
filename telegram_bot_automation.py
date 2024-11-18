@@ -2,7 +2,6 @@ import logging
 import random
 import time
 import json
-import requests
 import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
@@ -11,7 +10,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import NoSuchElementException, WebDriverException, TimeoutException, ElementNotInteractableException
 from browser_manager import BrowserManager
-import pyautogui
 from selenium.webdriver.common.action_chains import ActionChains
 from utils import update_balance_table
 from colorama import Fore, Style
