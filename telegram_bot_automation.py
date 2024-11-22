@@ -173,7 +173,7 @@ class TelegramBotAutomation:
                 return False  # Если секция не найдена, завершаем выполнение
 
             # Выполняем квесты
-            quest_count = 14  # Количество квестов (или используем динамическое определение)
+            quest_count = 16  # Количество квестов (или используем динамическое определение)
             for i in range(1, quest_count + 1):
                 try:
                     # Ищем основной контейнер с квестами перед каждой итерацией
@@ -451,8 +451,7 @@ class TelegramBotAutomation:
                         return True
                     else:
                         logger.warning(f"Account {self.serial_number}: Quest section not found.")
-                        return False
-                return True
+                        return False                
             else:
                 logger.warning(f"Account {self.serial_number}: No answer found for question '{question_text}' in quest.")
                 return False
@@ -654,17 +653,22 @@ class TelegramBotAutomation:
 
     def is_quest_completed(self):
         """
-        Проверяет, завершён ли квест, на основе текста "Выполнено" или "Completed", с тремя попытками поиска.
+        Проверяет, завершён ли квест, на основе текста "Выполнено" или "Completed", с тремя попытками поиска
+        и навигацией к секции.
         """
         max_attempts = 3  # Максимальное количество попыток
         for attempt in range(1, max_attempts + 1):
             try:
-                logger.info(f"Attempt {attempt}/{max_attempts} to check if quest is completed.")
+                #logger.info(f"Attempt {attempt}/{max_attempts} to check if quest is completed.")
                 
                 # Находим секцию квеста по тексту
                 quest_section = self.wait_for_element(By.XPATH, "//*[contains(text(), 'Explore crypto') or contains(text(), 'Исследуйте мир крипты')]")
                 
                 if quest_section:
+                    # Прокручиваем к секции, чтобы она была видимой
+                    self.driver.execute_script("arguments[0].scrollIntoView({ behavior: 'smooth', block: 'center' });", quest_section)
+                    logger.info(f"Quest section found and navigated to on attempt {attempt}.")
+
                     # Поднимаемся к общему контейнеру
                     quest_container = quest_section.find_element(By.XPATH, "./ancestor::div[contains(@style, 'position: relative')]")
                     
@@ -680,7 +684,7 @@ class TelegramBotAutomation:
                 elif attempt == max_attempts:
                     logger.warning("Quest section not found after all attempts.")
                     return False
-                
+
             except Exception as e:
                 logger.error(f"Error in attempt {attempt}/{max_attempts} of is_quest_completed: {e}")
             
@@ -691,6 +695,7 @@ class TelegramBotAutomation:
         # Если все попытки не увенчались успехом, возвращаем False
         logger.error("All attempts to check if quest is completed failed.")
         return False
+
 
 
 
