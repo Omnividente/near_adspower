@@ -838,14 +838,16 @@ class TelegramBotAutomation:
         except WebDriverException as e:
             logger.warning(f"Account {self.serial_number}: Error closing extra windows: {str(e)}")
 
-    def send_message(self, message):
+    def send_message(self):
         retries = 0
         while retries < self.MAX_RETRIES:
             try:
                 chat_input_area = self.wait_for_element(By.XPATH, '/html/body/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/input[1]')
                 if chat_input_area:
                     chat_input_area.click()
-                    chat_input_area.send_keys(message)
+                    
+                    group_url = self.settings.get('TELEGRAM_GROUP_URL', 'https://t.me/CryptoProjects_sbt')
+                    chat_input_area.send_keys(group_url)
                     search_area = self.wait_for_element(By.XPATH, '/html/body/div[1]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[2]/div[2]/div[1]/div[1]/div[1]/div[2]/ul[1]/a[1]/div[1]')
                     if search_area:
                         search_area.click()
@@ -862,7 +864,12 @@ class TelegramBotAutomation:
         retries = 0
         while retries < self.MAX_RETRIES:
             try:
-                link = self.wait_for_element(By.CSS_SELECTOR, f"a[href*='{self.settings.get('REF_LINK')}']")
+                # Получаем ссылку из настроек
+                bot_link = self.settings.get('BOT_LINK', 'https://t.me/herewalletbot/app?startapp=286283')
+                # Поиск элемента ссылки
+                
+                link = self.wait_for_element(By.CSS_SELECTOR, f"a[href*='{bot_link}']")
+
                 if link:
                     link.click()
                     time.sleep(2)                    
