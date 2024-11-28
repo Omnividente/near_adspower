@@ -35,13 +35,27 @@ settings = load_settings()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Handler for SIGINT to ensure graceful shutdown
+# Обработчик сигнала SIGINT
 def signal_handler(sig, frame):
     global interrupted
     interrupted = True  # Устанавливаем флаг прерывания
-    logger.error("Process interrupted by user. Exiting...")
+    logger.error("Process interrupted by user. Stopping all tasks...")
+
+    # Остановка всех активных таймеров
     for timer in active_timers:
         timer.cancel()
+    active_timers.clear()
+
+    # Закрытие всех браузеров
+    for account, info in account_info.items():
+        if "browser" in info and info["browser"]:
+            try:
+                info["browser"].api_stop_browser()
+                logger.info(f"Browser for account {account} closed.")
+            except Exception as e:
+                logger.warning(f"Error while closing browser for account {account}: {e}")
+    
+    logger.info("All tasks stopped. Exiting program.")
     sys.exit(0)
 
 def is_account_completed(account, filename="all_quest_complete.txt"):
@@ -93,6 +107,9 @@ def process_account_task(account, settings):
     try:
         bot = TelegramBotAutomation(account, settings)
 
+        # Сохраняем ссылку на браузер в account_info
+        account_info[account]["browser"] = bot.browser_manager
+
         if not bot.navigate_to_bot():
             raise Exception("Failed to navigate to bot")
 
@@ -136,6 +153,7 @@ def process_account_task(account, settings):
         if bot:
             bot.browser_manager.api_stop_browser()
         logger.info(f"Account {account}: Task ended.")
+        account_info[account]["browser"] = None
 
     if remaining_time_seconds:
         next_run_time = (datetime.now() + timedelta(seconds=remaining_time_seconds)).strftime("%Y-%m-%d %H:%M:%S")
@@ -152,7 +170,8 @@ def process_account_task(account, settings):
     else:
         account_info[account]["next_run_time"] = "Immediate"
         account_info[account]["status"] = "Completed"
-    display_balance_table(account_info)    
+    display_balance_table(account_info)
+    
 
 def process_accounts():
     reset_balances()
