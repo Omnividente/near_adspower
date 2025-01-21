@@ -2,5 +2,3 @@ requests
 selenium
 colorama
 prettytable
-termcolor
-keyboard
