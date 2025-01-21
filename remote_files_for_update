@@ -5,4 +5,3 @@ main.py
 remote_files_for_update
 requirements.txt
 update_manager.py
-quest_executor.py
