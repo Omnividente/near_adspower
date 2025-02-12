@@ -1017,43 +1017,71 @@ class TelegramBotAutomation:
                 f"Account {self.serial_number}: Error closing extra windows: {str(e)}")
 
     def send_message(self):
+        """
+        Отправляет сообщение в указанный Telegram-групповой чат.
+        """
         retries = 0
         while retries < self.MAX_RETRIES:
-            if stop_event.is_set():  # Проверка на прерывание
-                logger.debug(
-                    f"Account {self.serial_number}: Message sending interrupted by stop_event.")
-                return False
             try:
+                logger.debug(
+                    f"#{self.serial_number}: Attempt {retries + 1} to send message.")
+
+                # Находим область ввода сообщения
                 chat_input_area = self.wait_for_element(
-                    By.XPATH, '/html/body/div[1]/div[1]/div[1]/div[1]/div[1]/div[1]/div[2]/input[1]')
+                    By.CSS_SELECTOR, '.input-search-input'
+                )
                 if chat_input_area:
-                    chat_input_area.click()
-
-                    group_url = self.settings.get(
-                        'TELEGRAM_GROUP_URL', 'https://t.me/CryptoProjects_sbt')
-                    chat_input_area.send_keys(group_url)
-
-                    search_area = self.wait_for_element(
-                        By.XPATH, '/html/body/div[1]/div[1]/div[1]/div[1]/div[1]/div[3]/div[2]/div[2]/div[2]/div[1]/div[1]/div[1]/div[2]/ul[1]/a[1]/div[1]')
-                    if search_area:
-                        search_area.click()
-                        logger.debug(
-                            f"Account {self.serial_number}: Message sent to group.")
-                if stop_event.wait(random.randint(5, 7)):  # Ожидание вместо time.sleep
                     logger.debug(
-                        f"Account {self.serial_number}: Message sending interrupted during wait.")
-                    return False
+                        f"#{self.serial_number}: Chat input area found.")
+                    chat_input_area.click()
+                    group_url = self.settings.get(
+                        'TELEGRAM_GROUP_URL', 'https://t.me/CryptoProjects_sbt'
+                    )
+                    logger.debug(
+                        f"#{self.serial_number}: Typing group URL: {group_url}")
+                    chat_input_area.send_keys(group_url)
+                else:
+                    logger.warning(
+                        f"#{self.serial_number}: Chat input area not found.")
+                    retries += 1
+                    stop_event.wait(5)
+                    continue
+
+                # Находим область поиска
+                selector = "div.search-group.search-group-contacts.is-short div.c-ripple"
+                search_area = self.wait_for_element(By.CSS_SELECTOR, selector)
+                if search_area:
+                    logger.debug(f"#{self.serial_number}: Search area found.")
+                    search_area.click()
+                    logger.debug(
+                        f"#{self.serial_number}: Group search clicked.")
+                else:
+                    logger.warning(
+                        f"#{self.serial_number}: Search area not found.")
+                    retries += 1
+                    stop_event.wait(5)
+                    continue
+
+                # Добавляем задержку перед завершением
+                sleep_time = random.randint(5, 7)
+                logger.debug(
+                    f"{Fore.LIGHTBLACK_EX}Sleeping for {sleep_time} seconds.{Style.RESET_ALL}")
+                stop_event.wait(sleep_time)
+                logger.debug(
+                    f"#{self.serial_number}: Message successfully sent to the group.")
                 return True
             except (NoSuchElementException, WebDriverException) as e:
-                logger.debug(
-                    f"Account {self.serial_number}: Error in send_message (attempt {retries + 1}): {str(e)}")
+                error_message = str(e).splitlines()[0]
+                logger.warning(
+                    f"#{self.serial_number}: Failed to perform action (attempt {retries + 1}): {error_message}")
                 retries += 1
-                if stop_event.wait(5):  # Ожидание вместо time.sleep
-                    logger.debug(
-                        f"Account {self.serial_number}: Message sending interrupted during retry wait.")
-                    return False
-        logger.debug(
-            f"Account {self.serial_number}: Exceeded maximum retries ({self.MAX_RETRIES}). Message sending failed.")
+                stop_event.wait(5)
+            except Exception as e:
+                logger.error(f"#{self.serial_number}: Unexpected error: {e}")
+                break
+
+        logger.error(
+            f"#{self.serial_number}: Failed to send message after {self.MAX_RETRIES} attempts.")
         return False
 
     def click_link(self):
